@@ -58,6 +58,7 @@ class LaravelEpayServer
 
         $month = str_pad($expirationMonth, 2, "0", STR_PAD_LEFT);
         $year  = str_pad($expirationYear, 2, "0", STR_PAD_LEFT);
+        $total = round($amount, 2) * 100;
 
         $url        = config('laravel-epayserver.test') ? 'https://epaytestvisanet.com.gt/?wsdl' : 'https://epayvisanet.com.gt/?wsdl';
         $soapClient = new SoapClient($url, ["trace" => 1]);
@@ -66,11 +67,11 @@ class LaravelEpayServer
                 'posEntryMode'     => '012',
                 'pan'              => $creditCard,
                 'expdate'          => $year . $month,
-                'amount'           => ($amount * 100),
+                'amount'           => $total,
                 'cvv2'             => $cvv2,
-                'paymentgwIP'      => '190.149.69.135',
-                'shopperIP'        => '190.149.168.54',
-                'merchantServerIP' => '67.205.167.98',
+                'paymentgwIP'      => request()->ip(),
+                'shopperIP'        => request()->ip(),
+                'merchantServerIP' => request()->ip(),
                 'merchantUser'     => config('laravel-epayserver.user'),
                 'merchantPasswd'   => config('laravel-epayserver.password'),
                 'merchant'         => config('laravel-epayserver.affilliation'),
