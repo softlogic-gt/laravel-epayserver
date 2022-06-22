@@ -3,6 +3,8 @@ namespace SoftlogicGT\LaravelEpayServer;
 
 use SoapFault;
 use SoapClient;
+use LVR\CreditCard\CardCvc;
+use LVR\CreditCard\CardNumber;
 use Illuminate\Support\Facades\Validator;
 
 class LaravelEpayServer
@@ -42,7 +44,8 @@ class LaravelEpayServer
         $data = compact("creditCard", "expirationMonth", "expirationYear", "cvv2", "amount", "externalId", "messageType");
 
         $rules = [
-            'cvv2'            => 'required|min:3|max:4',
+            'creditCard'      => ['required', new CardNumber],
+            'cvv2'            => ['required', new CardCvc($creditCard)],
             'expirationMonth' => 'required|numeric|lte:12|gte:1',
             'expirationYear'  => 'required|numeric|lte:99|gte:1',
             'amount'          => 'required|numeric',
@@ -82,7 +85,7 @@ class LaravelEpayServer
             ],
         ];
 
-        print_r($params);
+        // print_r($params);
         try {
             $res  = $soapClient->AuthorizationRequest($params);
             $code = $res->response->responseCode;
