@@ -1,11 +1,11 @@
 <?php
 namespace SoftlogicGT\LaravelEpayServer;
 
-use SoapFault;
 use SoapClient;
 use LVR\CreditCard\CardCvc;
 use LVR\CreditCard\CardNumber;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class LaravelEpayServer
 {
@@ -41,6 +41,7 @@ class LaravelEpayServer
 
     protected static function common($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId, $messageType)
     {
+        ini_set("default_socket_timeout", 10);
         $data = compact("creditCard", "expirationMonth", "expirationYear", "cvv2", "amount", "externalId", "messageType");
 
         $rules = [
@@ -56,12 +57,13 @@ class LaravelEpayServer
         $validator = Validator::make($data, $rules);
 
         if ($validator->fails()) {
-            abort(422, json_encode(['errors' => $validator->errors()]));
+            throw new ValidationException($validator);
         }
 
-        $month = str_pad($expirationMonth, 2, "0", STR_PAD_LEFT);
-        $year  = str_pad($expirationYear, 2, "0", STR_PAD_LEFT);
-        $total = round($amount, 2) * 100;
+        $month      = str_pad($expirationMonth, 2, "0", STR_PAD_LEFT);
+        $year       = str_pad($expirationYear, 2, "0", STR_PAD_LEFT);
+        $total      = (int) (round($amount, 2) * 100);
+        $externalId = str_pad(substr($externalId, -6, 6), 6, "0", STR_PAD_LEFT);
 
         $url        = config('laravel-epayserver.test') ? 'https://epaytestvisanet.com.gt/?wsdl' : 'https://epayvisanet.com.gt/?wsdl';
         $soapClient = new SoapClient($url, ["trace" => 1]);
@@ -85,38 +87,16 @@ class LaravelEpayServer
             ],
         ];
 
-        // print_r($params);
-        try {
-            $res  = $soapClient->AuthorizationRequest($params);
-            $code = $res->response->responseCode;
-            //If succesful response, return full response
-            if ($code == '00') {
-                return $res->response;
-            }
-            //If error, return error from list or unknown
-            if (array_key_exists($code, self::$codes)) {
-                abort(400, self::$codes[$code]);
-            }
-            abort(400, "Error desconocido: " . $code);
-
-        } catch (SoapFault $exception) {
-            echo '<h2>exception</h2>';
-            print_r($exception);
-            echo '<br/><h2>exception trace</h2>';
-            var_dump($exception->getTraceAsString());
-
-            echo '<br/>Request headers : <br/><xmp>',
-            $soapClient->__getLastRequestHeaders(),
-                '</xmp><br/>';
-            echo 'Request : <br/><xmp>',
-            $soapClient->__getLastRequest(),
-                '</xmp><br/>';
-            echo 'Response headers: <br/><xmp>',
-            $soapClient->__getLastResponseHeaders(),
-                '</xmp><br/>';
-            echo 'Response : <br/><xmp>',
-            $soapClient->__getLastResponse(),
-                '</xmp><br/>';
+        $res  = $soapClient->AuthorizationRequest($params);
+        $code = $res->response->responseCode;
+        //If succesful response, return full response
+        if ($code == '00') {
+            return $res->response;
         }
+        //If error, return error from list or unknown
+        if (array_key_exists($code, self::$codes)) {
+            abort(400, self::$codes[$code]);
+        }
+        abort(400, "Error desconocido: " . $code);
     }
 }
