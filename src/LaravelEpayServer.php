@@ -4,11 +4,14 @@ namespace SoftlogicGT\LaravelEpayServer;
 use SoapClient;
 use LVR\CreditCard\CardCvc;
 use LVR\CreditCard\CardNumber;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class LaravelEpayServer
 {
+    protected static $approvedInstallments = [3, 6, 10, 12, 18, 24];
+
     protected static $codes = [
         "00" => "Aprobada",
         "01" => "Refiérase al Emisor",
@@ -39,7 +42,31 @@ class LaravelEpayServer
         return self::common($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId, '0200');
     }
 
-    protected static function common($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId, $messageType)
+    public static function installments($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId, $installments)
+    {
+        $data = compact("creditCard", "expirationMonth", "expirationYear", "cvv2", "amount", "externalId", "installments");
+
+        $rules = [
+            'installments' => ['required', Rule::in(self::$approvedInstallments)],
+        ];
+
+        $validator = Validator::make($data, $rules);
+
+        if ($validator->fails()) {
+            throw new ValidationException($validator);
+        }
+
+        $additionalData = 'VC' . str_pad($installments, 2, "0", STR_PAD_LEFT);
+
+        return self::common($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId, '0200', $additionalData);
+    }
+
+    public static function points($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId)
+    {
+        return self::common($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId, '0200', 'LU');
+    }
+
+    protected static function common($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId, $messageType, $additionalData = '')
     {
         ini_set("default_socket_timeout", 10);
         $data = compact("creditCard", "expirationMonth", "expirationYear", "cvv2", "amount", "externalId", "messageType");
@@ -83,7 +110,7 @@ class LaravelEpayServer
                 'terminalId'       => config('laravel-epayserver.terminal'),
                 'messageType'      => $messageType,
                 'auditNumber'      => $externalId,
-                'additionalData'   => '',
+                'additionalData'   => $additionalData,
             ],
         ];
 
