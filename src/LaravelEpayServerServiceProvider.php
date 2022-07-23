@@ -11,6 +11,7 @@ class LaravelEpayServerServiceProvider extends ServiceProvider
     public function boot(Router $router)
     {
         $this->mergeConfigFrom(__DIR__ . '/config/laravel-epayserver.php', 'laravel-epayserver');
+        $this->loadViewsFrom(__DIR__ . '/resources/views/', 'laravel-epayserver');
         $this->publishes([
             __DIR__ . '/config/laravel-epayserver.php' => config_path('laravel-epayserver.php'),
         ], 'config');

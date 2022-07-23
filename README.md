@@ -20,6 +20,8 @@ EPAY_SERVER_PASSWORD=
 
 ## Usage
 
+In the constructor, if the email is specified, a confirmation receipt is sent. The default subject is `Comprobante de pago`.
+
 ### Sale
 
 ```
@@ -32,7 +34,17 @@ $cvv2 = '123';
 $amount = 1230.00;
 $externalId = '557854';
 
-$response = LaravelEpayServer::sale($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId);
+$server = new LaravelEpayServer(
+    [
+        'receipt' => [
+            'email'   => 'email@email.com',
+            'subject' => 'My custom subject',
+            'name'    => 'The name to print on the receipt'
+        ]
+    ]
+);
+
+$response = $server->sale($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId);
 ```
 
 It will throw an exception if any error is received from Epay Server, or an object with the following info:

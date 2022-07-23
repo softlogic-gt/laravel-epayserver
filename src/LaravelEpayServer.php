@@ -1,18 +1,28 @@
 <?php
 namespace SoftlogicGT\LaravelEpayServer;
 
+use Throwable;
 use SoapClient;
+use Carbon\Carbon;
 use LVR\CreditCard\CardCvc;
 use LVR\CreditCard\CardNumber;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use SoftlogicGT\LaravelEpayServer\Jobs\SendReceipt;
+use SoftlogicGT\LaravelEpayServer\Jobs\SendReversal;
 
 class LaravelEpayServer
 {
-    protected static $approvedInstallments = [3, 6, 10, 12, 18, 24];
+    protected $approvedInstallments = [3, 6, 10, 12, 18, 24];
+    protected $receipt              = [
+        'email'   => null,
+        'subject' => 'Comprobante de pago',
+        'name'    => '',
+    ];
 
-    protected static $codes = [
+    protected $codes = [
         "00" => "Aprobada",
         "01" => "Refiérase al Emisor",
         "02" => "Refiérase al Emisor",
@@ -37,17 +47,34 @@ class LaravelEpayServer
         "96" => "Error del sistema, intente más tarde",
     ];
 
-    public static function sale($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId)
+    public function __construct(array $config = [])
     {
-        return self::common($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId, '0200');
+        if (isset($config['receipt'])) {
+            if (isset($config['receipt']['email'])) {
+                $this->receipt['email'] = $config['receipt']['email'];
+            }
+
+            if (isset($config['receipt']['subject'])) {
+                $this->receipt['subject'] = $config['receipt']['subject'];
+            }
+
+            if (isset($config['receipt']['name'])) {
+                $this->receipt['name'] = $config['receipt']['name'];
+            }
+        }
     }
 
-    public static function installments($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId, $installments)
+    public function sale($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId)
+    {
+        return $this->common($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId, '0200');
+    }
+
+    public function installments($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId, $installments)
     {
         $data = compact("creditCard", "expirationMonth", "expirationYear", "cvv2", "amount", "externalId", "installments");
 
         $rules = [
-            'installments' => ['required', Rule::in(self::$approvedInstallments)],
+            'installments' => ['required', Rule::in($this->approvedInstallments)],
         ];
 
         $validator = Validator::make($data, $rules);
@@ -58,18 +85,23 @@ class LaravelEpayServer
 
         $additionalData = 'VC' . str_pad($installments, 2, "0", STR_PAD_LEFT);
 
-        return self::common($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId, '0200', $additionalData);
+        return $this->common($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId, '0200', $additionalData);
     }
 
-    public static function points($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId)
+    public function points($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId)
     {
-        return self::common($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId, '0200', 'LU');
+        return $this->common($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId, '0200', 'LU');
     }
 
-    protected static function common($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId, $messageType, $additionalData = '')
+    public function reversal($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId)
+    {
+        return $this->common($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId, '0400');
+    }
+
+    protected function common($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId, $messageType, $additionalData = '')
     {
         ini_set("default_socket_timeout", 10);
-        $data = compact("creditCard", "expirationMonth", "expirationYear", "cvv2", "amount", "externalId", "messageType");
+        $data = compact("creditCard", "expirationMonth", "expirationYear", "cvv2", "amount", "externalId", "messageType", "additionalData");
 
         $rules = [
             'creditCard'      => ['required', new CardNumber],
@@ -92,37 +124,63 @@ class LaravelEpayServer
         $total      = (int) (round($amount, 2) * 100);
         $externalId = str_pad(substr($externalId, -6, 6), 6, "0", STR_PAD_LEFT);
 
-        $url        = config('laravel-epayserver.test') ? 'https://epaytestvisanet.com.gt/?wsdl' : 'https://epayvisanet.com.gt/?wsdl';
-        $soapClient = new SoapClient($url, ["trace" => 1]);
-        $params     = [
-            'AuthorizationRequest' => [
-                'posEntryMode'     => '012',
-                'pan'              => $creditCard,
-                'expdate'          => $year . $month,
-                'amount'           => $total,
-                'cvv2'             => $cvv2,
-                'paymentgwIP'      => request()->ip(),
-                'shopperIP'        => request()->ip(),
-                'merchantServerIP' => request()->ip(),
-                'merchantUser'     => config('laravel-epayserver.user'),
-                'merchantPasswd'   => config('laravel-epayserver.password'),
-                'merchant'         => config('laravel-epayserver.affilliation'),
-                'terminalId'       => config('laravel-epayserver.terminal'),
-                'messageType'      => $messageType,
-                'auditNumber'      => $externalId,
-                'additionalData'   => $additionalData,
-            ],
-        ];
+        $url = config('laravel-epayserver.test') ? 'https://epaytestvisanet.com.gt/?wsdl' : 'https://epayvisanet.com.gt/?wsdl';
 
-        $res  = $soapClient->AuthorizationRequest($params);
+        try {
+
+            $soapClient = new SoapClient($url, ["trace" => 1]);
+            $params     = [
+                'AuthorizationRequest' => [
+                    'posEntryMode'     => '012',
+                    'pan'              => $creditCard,
+                    'expdate'          => $year . $month,
+                    'amount'           => $total,
+                    'cvv2'             => $cvv2,
+                    'paymentgwIP'      => request()->ip(),
+                    'shopperIP'        => request()->ip(),
+                    'merchantServerIP' => request()->ip(),
+                    'merchantUser'     => config('laravel-epayserver.user'),
+                    'merchantPasswd'   => config('laravel-epayserver.password'),
+                    'merchant'         => config('laravel-epayserver.affilliation'),
+                    'terminalId'       => config('laravel-epayserver.terminal'),
+                    'messageType'      => $messageType,
+                    'auditNumber'      => $externalId,
+                    'additionalData'   => $additionalData,
+                ],
+            ];
+            $res = $soapClient->AuthorizationRequest($params);
+        } catch (Throwable $th) {
+            Log::error($th);
+            if ($messageType != '0400') {
+                SendReversal::dispatch($data)->delay(now()->addMinute());
+            }
+            abort(500, "No fue posible realizar la transacción, intente de nuevo");
+        }
         $code = $res->response->responseCode;
         //If succesful response, return full response
         if ($code == '00') {
+            if ($this->receipt['email']) {
+                $receiptData = [
+                    'email'        => $this->receipt['email'],
+                    'subject'      => $this->receipt['subject'],
+                    'name'         => $this->receipt['name'],
+                    'cc'           => '####-####-####-' . substr($creditCard, -4, 4),
+                    'date'         => Carbon::now(),
+                    'amount'       => $total,
+                    'ref_number'   => $res->response->referenceNumber,
+                    'auth_number'  => $res->response->authorizationNumber,
+                    'audit_number' => $res->response->auditNumber,
+                    'merchant'     => config('laravel-epayserver.affilliation'),
+                ];
+
+                SendReceipt::dispatch($receiptData);
+            }
+
             return $res->response;
         }
         //If error, return error from list or unknown
-        if (array_key_exists($code, self::$codes)) {
-            abort(400, self::$codes[$code]);
+        if (array_key_exists($code, $this->codes)) {
+            abort(400, $this->codes[$code]);
         }
         abort(400, "Error desconocido: " . $code);
     }
