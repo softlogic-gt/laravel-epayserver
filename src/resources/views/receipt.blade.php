@@ -10,7 +10,7 @@
         </tr>
         <tr>
             <td>Monto de la venta</td>
-            <td>{{ number_format($receiptData['amount'] / 100,2) }}</td>
+            <td>Q. {{ number_format($receiptData['amount'] / 100,2) }}</td>
         </tr>
         <tr>
             <td>Nombre tarjeta</td>
