@@ -100,7 +100,6 @@ class LaravelEpayServer
 
     protected function common($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId, $messageType, $additionalData = '')
     {
-        ini_set("default_socket_timeout", 10);
         $data = compact("creditCard", "expirationMonth", "expirationYear", "cvv2", "amount", "externalId", "messageType", "additionalData");
 
         $rules = [
@@ -124,12 +123,13 @@ class LaravelEpayServer
         $total      = (int) (round($amount, 2) * 100);
         $externalId = str_pad(substr($externalId, -6, 6), 6, "0", STR_PAD_LEFT);
 
-        $url = config('laravel-epayserver.test') ? 'https://epaytestvisanet.com.gt/?wsdl' : 'https://epayvisanet.com.gt/?wsdl';
-
         try {
-
-            $soapClient = new SoapClient($url, ["trace" => 1]);
-            $params     = [
+            ini_set("default_socket_timeout", 30);
+            $soapClient = new SoapClient($this->getURL(), [
+                "trace"              => 1,
+                'connection_timeout' => 30,
+            ]);
+            $params = [
                 'AuthorizationRequest' => [
                     'posEntryMode'     => '012',
                     'pan'              => $creditCard,
@@ -166,7 +166,81 @@ class LaravelEpayServer
                     'name'         => $this->receipt['name'],
                     'cc'           => '####-####-####-' . substr($creditCard, -4, 4),
                     'date'         => Carbon::now(),
-                    'amount'       => $total,
+                    'amount'       => $messageType != '0400' ? $total : -$total,
+                    'ref_number'   => $res->response->referenceNumber,
+                    'auth_number'  => $res->response->authorizationNumber,
+                    'audit_number' => $res->response->auditNumber,
+                    'merchant'     => config('laravel-epayserver.affilliation'),
+                ];
+
+                SendReceipt::dispatch($receiptData);
+            }
+
+            return $res->response;
+        }
+        //If error, return error from list or unknown
+        if (array_key_exists($code, $this->codes)) {
+            abort(400, $this->codes[$code]);
+        }
+        abort(400, "Error desconocido: " . $code);
+    }
+
+    protected function getURL()
+    {
+        return config('laravel-epayserver.test') ? 'https://epaytestvisanet.com.gt/?wsdl' : 'https://epayvisanet.com.gt/?wsdl';
+    }
+
+    public function void($auditNumber, $total)
+    {
+        $data = compact("auditNumber", "total");
+
+        $rules = [
+            'auditNumber' => 'required',
+            'total'       => 'required|numeric',
+        ];
+
+        $validator = Validator::make($data, $rules);
+
+        if ($validator->fails()) {
+            throw new ValidationException($validator);
+        }
+
+        try {
+            ini_set("default_socket_timeout", 30);
+            $soapClient = new SoapClient($this->getURL(), [
+                "trace"              => 1,
+                'connection_timeout' => 30,
+            ]);
+            $params = [
+                'AuthorizationRequest' => [
+                    'posEntryMode'     => '012',
+                    'paymentgwIP'      => request()->ip(),
+                    'shopperIP'        => request()->ip(),
+                    'merchantServerIP' => request()->ip(),
+                    'merchantUser'     => config('laravel-epayserver.user'),
+                    'merchantPasswd'   => config('laravel-epayserver.password'),
+                    'merchant'         => config('laravel-epayserver.affilliation'),
+                    'terminalId'       => config('laravel-epayserver.terminal'),
+                    'auditNumber'      => $auditNumber,
+                    'messageType'      => '0202',
+                ],
+            ];
+            $res = $soapClient->AuthorizationRequest($params);
+        } catch (Throwable $th) {
+            Log::error($th);
+            abort(500, "No fue posible realizar la reversión, intente de nuevo");
+        }
+        $code = $res->response->responseCode;
+        //If succesful response, return full response
+        if ($code == '00') {
+            if ($this->receipt['email']) {
+                $receiptData = [
+                    'email'        => $this->receipt['email'],
+                    'subject'      => $this->receipt['subject'],
+                    'name'         => $this->receipt['name'],
+                    'cc'           => '####-####-####-####',
+                    'date'         => Carbon::now(),
+                    'amount'       => -$total,
                     'ref_number'   => $res->response->referenceNumber,
                     'auth_number'  => $res->response->authorizationNumber,
                     'audit_number' => $res->response->auditNumber,
