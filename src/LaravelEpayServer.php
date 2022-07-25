@@ -230,7 +230,8 @@ class LaravelEpayServer
             Log::error($th);
             abort(500, "No fue posible realizar la reversión, intente de nuevo");
         }
-        $code = $res->response->responseCode;
+        $code  = $res->response->responseCode;
+        $total = (int) (round($total, 2) * -100);
         //If succesful response, return full response
         if ($code == '00') {
             if ($this->receipt['email']) {
@@ -240,7 +241,7 @@ class LaravelEpayServer
                     'name'         => $this->receipt['name'],
                     'cc'           => '####-####-####-####',
                     'date'         => Carbon::now(),
-                    'amount'       => -$total,
+                    'amount'       => $total,
                     'ref_number'   => $res->response->referenceNumber,
                     'auth_number'  => $res->response->authorizationNumber,
                     'audit_number' => $res->response->auditNumber,
