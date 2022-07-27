@@ -153,7 +153,7 @@ class LaravelEpayServer
         } catch (Throwable $th) {
             Log::error($th);
             if ($messageType != '0400') {
-                SendReversal::dispatch($data)->delay(now()->addSeconds($timeout));
+                SendReversal::dispatch($data);
             }
             abort(500, "No fue posible realizar la transacción, intente de nuevo");
         }
