@@ -201,11 +201,12 @@ class LaravelEpayServer
             throw new ValidationException($validator);
         }
 
+        $timeout = $this->getTimeout();
         try {
-            ini_set("default_socket_timeout", 30);
+            ini_set("default_socket_timeout", $timeout);
             $soapClient = new SoapClient($this->getURL(), [
                 "trace"              => 1,
-                'connection_timeout' => 30,
+                'connection_timeout' => $timeout,
             ]);
             $params = [
                 'AuthorizationRequest' => [
