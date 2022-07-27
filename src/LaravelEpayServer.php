@@ -123,11 +123,12 @@ class LaravelEpayServer
         $total      = (int) (round($amount, 2) * 100);
         $externalId = str_pad(substr($externalId, -6, 6), 6, "0", STR_PAD_LEFT);
 
+        $timeout = $this->getTimeout();
         try {
-            ini_set("default_socket_timeout", 30);
+            ini_set("default_socket_timeout", $timeout);
             $soapClient = new SoapClient($this->getURL(), [
                 "trace"              => 1,
-                'connection_timeout' => 30,
+                'connection_timeout' => $timeout,
             ]);
             $params = [
                 'AuthorizationRequest' => [
@@ -152,7 +153,7 @@ class LaravelEpayServer
         } catch (Throwable $th) {
             Log::error($th);
             if ($messageType != '0400') {
-                SendReversal::dispatch($data)->delay(now()->addMinute());
+                SendReversal::dispatch($data)->delay(now()->addSeconds($timeout));
             }
             abort(500, "No fue posible realizar la transacción, intente de nuevo");
         }
@@ -183,11 +184,6 @@ class LaravelEpayServer
             abort(400, $this->codes[$code]);
         }
         abort(400, "Error desconocido: " . $code);
-    }
-
-    protected function getURL()
-    {
-        return config('laravel-epayserver.test') ? 'https://epaytestvisanet.com.gt/?wsdl' : 'https://epayvisanet.com.gt/?wsdl';
     }
 
     public function void($auditNumber, $total)
@@ -258,5 +254,16 @@ class LaravelEpayServer
             abort(400, $this->codes[$code]);
         }
         abort(400, "Error desconocido: " . $code);
+    }
+
+    protected function getURL()
+    {
+        return config('laravel-epayserver.test') ? 'https://epaytestvisanet.com.gt/?wsdl' : 'https://epayvisanet.com.gt/?wsdl';
+    }
+
+    protected function getTimeout()
+    {
+        return config('laravel-epayserver.test') ? 30 : 60;
+
     }
 }
