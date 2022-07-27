@@ -151,7 +151,7 @@ class LaravelEpayServer
             ];
             $res = $soapClient->AuthorizationRequest($params);
         } catch (Throwable $th) {
-            Log::error($th);
+            Log::error($th->getMessage());
             if ($messageType != '0400') {
                 SendReversal::dispatch($data);
             }
@@ -264,7 +264,6 @@ class LaravelEpayServer
 
     protected function getTimeout()
     {
-        return config('laravel-epayserver.test') ? 30 : 60;
-
+        return config('laravel-epayserver.test') ? 30 : 50;
     }
 }
