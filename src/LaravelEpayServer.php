@@ -186,7 +186,7 @@ class LaravelEpayServer
         abort(400, "Error desconocido: " . $code);
     }
 
-    public function void($auditNumber, $total)
+    public function void($auditNumber, $total, $lastDigits = "####")
     {
         $data = compact("auditNumber", "total");
 
@@ -236,7 +236,7 @@ class LaravelEpayServer
                     'email'        => $this->receipt['email'],
                     'subject'      => $this->receipt['subject'],
                     'name'         => $this->receipt['name'],
-                    'cc'           => '####-####-####-####',
+                    'cc'           => '####-####-####-' . $lastDigits,
                     'date'         => Carbon::now(),
                     'amount'       => $total,
                     'ref_number'   => $res->response->referenceNumber,
