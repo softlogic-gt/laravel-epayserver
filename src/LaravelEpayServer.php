@@ -211,7 +211,7 @@ class LaravelEpayServer
             $params = [
                 'AuthorizationRequest' => [
                     'posEntryMode'     => '012',
-                    'paymentgwIP'      => request()->ip(),
+                    'paymentgwIP'      => '190.111.1.198',
                     'shopperIP'        => request()->ip(),
                     'merchantServerIP' => request()->ip(),
                     'merchantUser'     => config('laravel-epayserver.user'),
