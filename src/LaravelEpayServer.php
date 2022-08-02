@@ -259,7 +259,7 @@ class LaravelEpayServer
 
     protected function getURL()
     {
-        return config('laravel-epayserver.test') ? 'https://epaytestvisanet.com.gt/?wsdl' : 'https://epayvisanet.com.gt/?wsdl';
+        return config('laravel-epayserver.test') ? 'https://epaytestvisanet.com.gt/?wsdl' : 'https://epayvisanet.com.gt/paymentcommerce.asmx?WSDL';
     }
 
     protected function getTimeout()
