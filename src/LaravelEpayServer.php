@@ -122,6 +122,10 @@ class LaravelEpayServer
         $year       = str_pad($expirationYear, 2, "0", STR_PAD_LEFT);
         $total      = (int) (round($amount, 2) * 100);
         $externalId = str_pad(substr($externalId, -6, 6), 6, "0", STR_PAD_LEFT);
+        $ip         = request()->ip();
+        if ($ip == '127.0.0.1') {
+            $ip = '190.235.10.14';
+        }
 
         $timeout = $this->getTimeout();
         try {
@@ -137,9 +141,9 @@ class LaravelEpayServer
                     'expdate'          => $year . $month,
                     'amount'           => $total,
                     'cvv2'             => $cvv2,
-                    'paymentgwIP'      => request()->ip(),
-                    'shopperIP'        => request()->ip(),
-                    'merchantServerIP' => request()->ip(),
+                    'paymentgwIP'      => '190.111.1.198',
+                    'shopperIP'        => $ip,
+                    'merchantServerIP' => $ip,
                     'merchantUser'     => config('laravel-epayserver.user'),
                     'merchantPasswd'   => config('laravel-epayserver.password'),
                     'merchant'         => config('laravel-epayserver.affilliation'),
@@ -202,6 +206,11 @@ class LaravelEpayServer
         }
 
         $timeout = $this->getTimeout();
+        $ip      = request()->ip();
+        if ($ip == '127.0.0.1') {
+            $ip = '190.235.10.14';
+        }
+
         try {
             ini_set("default_socket_timeout", $timeout);
             $soapClient = new SoapClient($this->getURL(), [
@@ -212,8 +221,8 @@ class LaravelEpayServer
                 'AuthorizationRequest' => [
                     'posEntryMode'     => '012',
                     'paymentgwIP'      => '190.111.1.198',
-                    'shopperIP'        => request()->ip(),
-                    'merchantServerIP' => request()->ip(),
+                    'shopperIP'        => $ip,
+                    'merchantServerIP' => $ip,
                     'merchantUser'     => config('laravel-epayserver.user'),
                     'merchantPasswd'   => config('laravel-epayserver.password'),
                     'merchant'         => config('laravel-epayserver.affilliation'),
