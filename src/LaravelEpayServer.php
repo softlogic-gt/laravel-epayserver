@@ -165,9 +165,11 @@ class LaravelEpayServer
             throw new ValidationException($validator);
         }
 
-        $month      = str_pad($expirationMonth, 2, "0", STR_PAD_LEFT);
-        $year       = str_pad($expirationYear, 2, "0", STR_PAD_LEFT);
-        $total      = (int) (round($amount, 2) * 100);
+        $month = str_pad($expirationMonth, 2, "0", STR_PAD_LEFT);
+        $year  = str_pad($expirationYear, 2, "0", STR_PAD_LEFT);
+        $total = (int) (round($amount, 2) * 100);
+
+        // se agrega para evitar duplicados
         $externalId = $externalId . rand(1, 100);
         $externalId = str_pad(substr($externalId, -6, 6), 6, "0", STR_PAD_LEFT);
         $ip         = request()->ip();
