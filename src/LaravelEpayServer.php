@@ -168,6 +168,7 @@ class LaravelEpayServer
         $month      = str_pad($expirationMonth, 2, "0", STR_PAD_LEFT);
         $year       = str_pad($expirationYear, 2, "0", STR_PAD_LEFT);
         $total      = (int) (round($amount, 2) * 100);
+        $externalId = $externalId . rand(1, 100);
         $externalId = str_pad(substr($externalId, -6, 6), 6, "0", STR_PAD_LEFT);
         $ip         = request()->ip();
         if ($ip == '127.0.0.1') {
