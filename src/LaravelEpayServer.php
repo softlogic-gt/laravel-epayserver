@@ -73,7 +73,7 @@ class LaravelEpayServer
         "89" => "Terminal inválida",
         "91" => "Emisor NO disponible",
         "92" => "Destino no se puede encontrar para el enrutamiento",
-        "93" => "La transacción no se puede completar, violación de la ley",
+        "93" => "La transacción no se puede completar.  Solo se aceptan tarjetas locales Visa y Mastercard",
         "94" => "Transacción duplicada",
         "96" => "Mal funcionamiento del sistema, intente mas tarde",
         "N0" => "Fuerza CTPI",
