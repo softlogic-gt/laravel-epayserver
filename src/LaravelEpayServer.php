@@ -118,7 +118,8 @@ class LaravelEpayServer
 
     public function installments($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId, $installments)
     {
-        $data = compact("creditCard", "expirationMonth", "expirationYear", "cvv2", "amount", "externalId", "installments");
+        $expirationYear = (int) substr((string) $expirationYear, -2);
+        $data           = compact("creditCard", "expirationMonth", "expirationYear", "cvv2", "amount", "externalId", "installments");
 
         $rules = [
             'installments' => ['required', Rule::in($this->approvedInstallments)],
@@ -147,7 +148,8 @@ class LaravelEpayServer
 
     protected function common($creditCard, $expirationMonth, $expirationYear, $cvv2, $amount, $externalId, $messageType, $additionalData = '')
     {
-        $data = compact("creditCard", "expirationMonth", "expirationYear", "cvv2", "amount", "externalId", "messageType", "additionalData");
+        $expirationYear = (int) substr((string) $expirationYear, -2);
+        $data           = compact("creditCard", "expirationMonth", "expirationYear", "cvv2", "amount", "externalId", "messageType", "additionalData");
 
         $rules = [
             'creditCard'      => ['required', new CardNumber],
